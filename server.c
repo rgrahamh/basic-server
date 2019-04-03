@@ -62,9 +62,6 @@ char *parseExtension(const char *path, int path_len){
             else if(path[i] == '.' && path[i+1] == 'g' && path[i+2] == 'i' && path[i+3] == 'f'){
                 cont = "image/gif";
             }
-            else if(path[i] == '.' && path[i+1] == 'm' && path[i+2] == 'p' && path[i+3] == '3'){
-                cont = "audio/mpeg";
-            }
             else if(path[i] == '.' && path[i+1] == 'j' && path[i+2] == 'p' && path[i+3] == 'g'){
                 cont = "image/jpeg";
             }
@@ -109,7 +106,7 @@ int handleRequest(int sockfd, char *in_buff, int bytes_recv, char** path){
     int req_type = GET;
 
     //Stores the buffer size
-    int content_size = 0;
+    int content_size = -1;
     int message_size = 0;
 
     //Loading from the buffer into the 2D request array
@@ -185,8 +182,24 @@ int handleRequest(int sockfd, char *in_buff, int bytes_recv, char** path){
         //Open a file for reading
         FILE *file = fopen(*path, "r");
 
-        //If the file couldn't be found, send a code 404 and return with 1
-        if(!file){
+        //Initializing the file contents
+        char *file_contents = malloc(MAX_FILE_SIZE);
+        memset(file_contents, 0, MAX_FILE_SIZE);
+
+        //If the file could be found
+        if(file){
+            //Get the content size and read the file into the out_buff
+            fseek(file, 0, SEEK_END);
+            content_size = ftell(file);
+            fseek(file, 0, SEEK_SET);
+            fread(file_contents, content_size, 1, file);
+        }
+
+        //Building the base messsage
+        if(content_size != -1){
+            sprintf(out_buff, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nDate: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", content_type, date, content_size);
+        } else {
+            //If the file couldn't be found, send a code 404 and return with 1
             #ifdef TESTING
             printf("Could not open the file at %s!\n", *path);
             #endif
@@ -194,19 +207,7 @@ int handleRequest(int sockfd, char *in_buff, int bytes_recv, char** path){
             send(sockfd, out_buff, strlen(out_buff), 0);
             return 2;
         }
-        
-        //Initializing the file contents
-        char *file_contents = malloc(MAX_FILE_SIZE);
-        memset(file_contents, 0, MAX_FILE_SIZE);
 
-        //Get the content size and read the file into the out_buff
-        fseek(file, 0, SEEK_END);
-        content_size = ftell(file);
-        fseek(file, 0, SEEK_SET);
-        fread(file_contents, content_size, 1, file);
-
-        //Building the base messsage
-        sprintf(out_buff, "HTTP/1.1 200 OK\r\nContent-Type: %s\r\nDate: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n", content_type, date, content_size);
         message_size = strlen(out_buff);
         
         //If it's a GET request
@@ -294,11 +295,11 @@ int main(int argc, char **argv) {
                 //Child process
                 if(handleRequest(acceptfd, buff, bytes_recv, &path)){
                     #ifdef TESTING
-                    printf("Request not handled properly!\n\n");
+                    printf("Returned an error code!\n\n");
                     #endif
                 } else {
                     #ifdef TESTING
-                    printf("Request successfully handled!\n\n");
+                    printf("Returned a code 200!\n\n");
                     #endif
                 }
 
