@@ -7,7 +7,6 @@
 
 #define MAX_IN_BUFF_SIZE 4096 //The max request size
 #define MAX_OUT_BUFF_SIZE 4194304 //The max response size
-#define MAX_FILE_SIZE 4194304 //The max file size able to be served over the server
 #define MAX_PATH_LEN 120 //The maximum path length
 #define MAX_REQ 30 //The max number of header lines parsed
 #define MAX_REQ_SIZE 135 //The max length of each header
@@ -183,8 +182,7 @@ int handleRequest(int sockfd, char *in_buff, int bytes_recv, char** path){
         FILE *file = fopen(*path, "r");
 
         //Initializing the file contents
-        char *file_contents = malloc(MAX_FILE_SIZE);
-        memset(file_contents, 0, MAX_FILE_SIZE);
+        char *file_contents;
 
         //If the file could be found
         if(file){
@@ -192,6 +190,10 @@ int handleRequest(int sockfd, char *in_buff, int bytes_recv, char** path){
             fseek(file, 0, SEEK_END);
             content_size = ftell(file);
             fseek(file, 0, SEEK_SET);
+
+            //Allocate memory for the file
+            file_contents = malloc(content_size);
+            memset(file_contents, 0, content_size);
             fread(file_contents, content_size, 1, file);
         }
 
